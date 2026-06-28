@@ -1,0 +1,73 @@
+services:
+  # ── Streamlit UI ──────────────────────────────────────────
+  streamlit:
+    build:
+      context: ./app
+      dockerfile: Dockerfile.ui
+    command: streamlit run ui/streamlit_app.py --server.port 8501 --server.address 0.0.0.0
+    ports:
+      - "8501:8501"
+    environment:
+      - FASTAPI_URL=http://fastapi:8000
+    volumes:
+      - ./app:/app
+    depends_on:
+      fastapi:
+        condition: service_healthy
+    networks:
+      - agent-net
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8501/_stcore/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  # ── FastAPI + LangGraph Agent ──────────────────────────────
+  fastapi:
+    build:
+      context: ./app
+      dockerfile: Dockerfile.api
+    command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+    ports:
+      - "8000:8000"
+    environment:
+      - MCP_SERVER_URL=http://mcp-server:8001/sse
+      - LLM_PROVIDER=${LLM_PROVIDER:-ollama}
+      - OLLAMA_BASE_URL=${OLLAMA_BASE_URL:-http://host.docker.internal:11434}
+      - OLLAMA_MODEL=${OLLAMA_MODEL:-gemma4:26b}
+      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY:-}
+      - OPENROUTER_MODEL=${OPENROUTER_MODEL:-anthropic/claude-3-haiku}
+    volumes:
+      - ./app:/app
+    depends_on:
+      mcp-server:
+        condition: service_healthy
+    networks:
+      - agent-net
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  # ── FastMCP Server ─────────────────────────────────────────
+  mcp-server:
+    build:
+      context: ./mcp_server
+      dockerfile: Dockerfile
+    ports:
+      - "8001:8001"
+    volumes:
+      - ./mcp_server:/app
+      - ./data:/data
+    networks:
+      - agent-net
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8001/sse"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+networks:
+  agent-net:
+    driver: bridge
