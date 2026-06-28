@@ -2,6 +2,10 @@ FROM python:3.12-slim
 
 WORKDIR /app
 
+# curlのインストール（root権限が必要なため上部に配置）
+RUN apt-get update && apt-get install -y --no-install-recommends curl \
+    && rm -rf /var/lib/apt/lists/*
+    
 # 非rootユーザーで動かす（セキュリティ向上）
 RUN adduser --disabled-password --gecos "" mcpuser
 

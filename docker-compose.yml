@@ -62,8 +62,9 @@ services:
       - ./data:/data
     networks:
       - agent-net
+    command: python server.py
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8001/sse"]
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8001/sse').close()"]
       interval: 5s
       timeout: 3s
       retries: 5
